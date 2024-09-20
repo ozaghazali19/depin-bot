@@ -295,32 +295,36 @@ class Depin:
     def open_box(self, user_id: str, max_price: str):
         token = self.local_token(user_id)
         if not token:
-            log(mrh + f"Error: Token not found.")
+            log(mrh + "Error: Token not found.")
             return
         
         payload = {"amount": 1, "code": "CYBER_BOX"}
         headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
 
         while True:
-            estimate = self._request('POST', f"/devices/estimate-use-key", headers=headers, json=payload)
+            estimate = self._request('POST', "/devices/estimate-use-key", headers=headers, json=payload)
             if estimate.get('status') != 'success':
-                log(htm + f"Error estimating use key:", estimate.get('message'))
+                log(htm + "Error estimating use key: ", estimate.get('message'))
                 break
             
             points_needed = estimate.get('data', 0)
             if points_needed >= max_price:
-                log(kng + f"Max price exceeded, box will not be opened.")
+                log(kng + "Max price exceeded, box will not be opened.")
                 break
             
-            use_key = self._request('POST', f"/devices/use-key", headers=headers, json=payload)
-            if use_key.get('status') == 'success':
+            use_key = self._request('POST', "/devices/use-key", headers=headers, json=payload)
+            message = use_key.get('message', 'Unknown error')
+            if message == "MSG_ITEM_OPEN_NOT_ENOUGH":
+                log(kng + "You have no box to open!")
+                break
+            elif use_key.get('status') == 'success':
                 for reward in use_key.get('data', []):
                     reward_type = reward.get("type")
                     reward_name = reward.get("name")
                     reward_point = reward.get("point")
                     log(hju + f"Type: {pth}{reward_type}{hju}, Name: {pth}{reward_name}{hju}, Point: {pth}{reward_point}")
             else:
-                log(htm + "Error using key:", use_key.get('message'))
+                log(htm + "Error using key: ", use_key.get('message'))
 
     def get_items_by_type(self, user_id: str, item_type: str):
         token = self.local_token(user_id)
