@@ -45,18 +45,11 @@ class Depin:
     def set_proxy(self, proxy):
         proxies = {
             "http": f"http://{proxy}",
-            "https": f"https://{proxy}",
-        }
-        self.session.proxies.update(proxies)
-
-    def set_proxy(self, proxy):
-        proxies = {
-            "http": f"http://{proxy}",
+            "https": f"http://{proxy}",
         }
         self.session.proxies.update(proxies)
 
     def _request(self, method, endpoint, **kwargs):
-        """Wrapper around requests to handle proxy and make requests."""
         url = f"{self.base_url}{endpoint}"
         try:
             response = self.session.request(method, url, **kwargs)
@@ -120,9 +113,9 @@ class Depin:
                 return
             
             log(hju + f"Username: {pth}{user_info.get('username', 'N/A')} {hju}| Status: {pth}{user_info.get('status', 'N/A')}")
-            log(hju + f"Points: {pth}{user_info.get('point', 0):,} {hju}| Mining Power: {pth}{user_info.get('miningPower', 0):,}")
-            log(hju + f"Level: {pth}{user_info.get('level', 0):,} {hju}| Experience: {pth}{user_info.get('xp', 0):,}")
-            log(hju + f"Skill point: {pth}{user_info.get('pointSkill', 0):,} {hju}| Total device: {pth}{user_info.get('totalDevice', 0):,}")
+            log(hju + f"Points: {pth}{user_info.get('point', 0):,.0f} {hju}| Mining Power: {pth}{user_info.get('miningPower', 0):,.0f}")
+            log(hju + f"Level: {pth}{user_info.get('level', 0):,.0f} {hju}| Experience: {pth}{user_info.get('xp', 0):,.0f}")
+            log(hju + f"Skill point: {pth}{user_info.get('pointSkill', 0):,.0f} {hju}| Total device: {pth}{user_info.get('totalDevice', 0):,.0f}")
         
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
@@ -185,11 +178,13 @@ class Depin:
             return
         headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
         claim_data = self._request('GET', "/users/claim", headers=headers).get('data', {})
-        if claim_data.get('point') <= 1:
-            log(kng + f"No points to claim. starting contributions")
-            self.start(user_id)
-        else:
-            log(hju + f"Claimed: {pth}{claim_data.get('point', 0):,} {hju}points | Bonus: {pth}{claim_data.get('bonusReward', 0)}")
+        if claim_data is not None:
+            if claim_data.get('point') <= 1:
+                log(kng + f"No points to claim. starting contributions")
+                self.start(user_id)
+            else:
+                log(hju + f"Claimed: {pth}{claim_data.get('point', 0):,.0f} {hju}points | Bonus: {pth}{claim_data.get('bonusReward', 0)}")
+        return 
 
     def get_task(self, user_id: str):
         token = self.local_token(user_id)
@@ -216,6 +211,7 @@ class Depin:
                 if mission.get('status') is None:
                     self.handle_task(user_id, mission['id'], 'verify', mission['name'])
                     self.handle_task(user_id, mission['id'], 'claim', mission['name'])
+        log(bru + f"Other task may need a verifications!")
 
     def handle_task(self, user_id: str, task_id: str, action: str, task_name: str):
         token = self.local_token(user_id)
@@ -225,20 +221,20 @@ class Depin:
         headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
         data = self._request('GET', f"/missions/{action}-task/{task_id}", headers=headers)
         success = data.get("data", True)
-        log(bru + f"{action.capitalize()} {pth}{task_name} {hju + f'succeeded' if success else mrh + f'failed'}")
-
+        if success:
+            log(hju + f"Succeeded {pth}{task_name}")
+        
     def time_format(self, waiting_time):
-        if waiting_time > 0:
-            if waiting_time > 31536000: 
-                waiting_time = waiting_time / 1000
+        if isinstance(waiting_time, (int, float)) and waiting_time > 0:
             try:
-                future_time = datetime.now() + timedelta(seconds=waiting_time)
-                return future_time.strftime("%H:%M:%S %d-%m-%Y")
-            except OverflowError:
-                log("Waiting time is too large to calculate.")
+                waiting_time = waiting_time / 1000  
+                future_time = datetime.fromtimestamp(waiting_time)  #
+                return future_time.strftime("%Y-%m-%d %H:%M:%S")
+            except Exception as e:
+                log(f"Error calculating time: {e}")
                 return "Invalid time"
         return "Ready"
-
+            
     def j_l(self, user_id: str):
         token = self.local_token(user_id)
         if not token:
@@ -275,7 +271,6 @@ class Depin:
         selected_skill = random.choice(upgradable_skills)
         skill_id = selected_skill['skillId']
         skill_name = selected_skill['name']
-
         payload = {"skillId": skill_id}
         headers = {**self.base_headers, "Authorization": f"Bearer {self.local_token(user_id)}"}
         response = requests.post(f"{self.base_url}/users/upgrade-skill", headers=headers, json=payload)
@@ -300,7 +295,6 @@ class Depin:
         
         payload = {"amount": 1, "code": "CYBER_BOX"}
         headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
-
         while True:
             estimate = self._request('POST', "/devices/estimate-use-key", headers=headers, json=payload)
             if estimate.get('status') != 'success':
@@ -344,12 +338,40 @@ class Depin:
                     log(hju + f"Current {pth}{item_type}{hju} item has lower power. Unequipping: {pth}{current_item['name']}{hju} | Power: {pth}{current_item['miningPower']}")
                     self.unequip_item(user_id, current_item['id'])
                 
-                log(hju + f"Adding highest power {pth}{item_type}: {highest_power_item['name']} {hju}| Power: {pth}{highest_power_item['miningPower']}")
+                log(hju + f"Adding highest {pth}{item_type}:")
+                log(hju + f"Name {pth}{highest_power_item['name']} {hju}| Power: {pth}{highest_power_item['miningPower']:,.0f}")
                 self.add_item_to_device(user_id, highest_power_item['id'], item_type)
             else:
                 log(kng + f"No items found for type {pth}{item_type}.")
         else:
             log(htm + "Error fetching items by type:", response.get('message'))
+
+    def log_items(self, device_index, items):
+        grouped_items = {
+            'CPU': [],
+            'RAM': [],
+            'SSD': [],
+            'GPU': [],
+            'Others': []
+        }
+        
+        for item in items:
+            name = item['name']
+            if 'CPU' in name:
+                grouped_items['CPU'].append(name)
+            elif 'RAM' in name:
+                grouped_items['RAM'].append(name)
+            elif 'SSD' in name:
+                grouped_items['SSD'].append(name)
+            elif 'DeForce' in name or 'GPU' in name:
+                grouped_items['GPU'].append(name)
+            else:
+                grouped_items['Others'].append(name)
+
+        log(hju + f"Equipped items for {pth}device {device_index}:")
+        for group_name, group in grouped_items.items():
+            if group: 
+                log(hju + f"{f'{pth} + {hju}'.join(group)}")
 
     def get_current_item(self, user_id: str, item_type: str):
         token = self.local_token(user_id)
@@ -383,15 +405,15 @@ class Depin:
             headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
             response = self._request('GET', f"/devices/add-item/{device_index}/{item_id}", headers=headers)
             if response.get('status') == 'success':
-                log(hju + f"Successfully added item {pth}{item_id}{hju} to device {pth}{device_index}.")
+                log(hju + f"Successfully added {pth}{item_id} {hju}to device {pth}{device_index}")
                 return 
             else:
                 message = response.get('message', 'Unknown error')
                 if message == "MSG_DEVICE_USER_CANNOT_ADD_MORE_ITEM":
-                    log(kng + f"Cannot add more {pth}{item_type} {kng}items to device {pth}{device_index}{kng}. Trying next device...")
+                    log(kng + f"Can't add more {pth}{item_type} {kng}to device {pth}{device_index}")
                 else:
                     log(htm + f"Error adding item to device:", message)
-        if len(device_indices) == 1:
+        if len(device_indices) <= 3:
             self.add_new_device(user_id)
 
     def get_device_indices(self, user_id: str):
@@ -419,7 +441,7 @@ class Depin:
         if response.get('status') == 'success':
             log(hju + "Successfully added a new device.")
         else:
-            log(htm + "Error adding new device:", response.get('message'))
+            return
 
     def unequip_item(self, user_id: str, item_id: int):
         token = self.local_token(user_id)
@@ -442,15 +464,17 @@ class Depin:
 
         headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
         response = self._request('GET', f"/devices/user-device-item?index={device_index}&page=1&size=12", headers=headers)
-        if response.get('status') == 'success':
+        if response is None:
+            log(mrh + f"No equipped items found for user ID: {pth}{user_id}")
+            return
+        elif response.get('status') == 'success':
             items = response.get('data', [])
-            log(hju + f"Equipped items for {pth}device {device_index}:")
-            log(hju + f"{', '.join(item['name'] for item in items)}")
+            self.log_items(device_index, items)
             return items
         else:
             log(htm + f"Error fetching equipped items:", response.get('message'), "| HTTP Status:", response.get('status'))
             return []
-
+   
     def auto_buy_item(self, user_id: str, device_index: int, max_item_price: float):
         token = self.local_token(user_id)
         if not token:
@@ -482,6 +506,9 @@ class Depin:
                             buy_response = self._request('POST', "/devices/buy-item", headers=headers, json={"number": 1, "code": item['code']})
                             if buy_response.get('status') == 'success':
                                 log(hju + f"Successfully bought {pth}{item['name']} {hju}with price {pth}{item['price']}.")
+                            elif buy_response.get("status") == "error" and buy_response.get("message") == "MSG_USER_POINT_NOT_ENOUGH":
+                                log(kng + f"Not enough point to buy the {pth}{item['name']} {kng}items!")
+                                return
                             else:
                                 log(htm + f"Error buying {item['name']}:", buy_response.get('message'))
                             break  
