@@ -6,8 +6,11 @@ This script is under development, there may still be many bugs or glitches that 
 
 ## REGISTER FIRST : [DEPIN ALIANCE](https://t.me/DePIN_Alliance_Bot?start=P8YJYaETWS)
 
-# Feature
+# Feature 24/09/2024
 
+  - Manage the items with the ability to sell items `NEW`
+  - Show Device 1 Equipment : bool True/False `NEW`
+  - Add Random User Agent `NEW`
   - Support for multiple proxy servers
   - Support for multiple telegram accounts
   - Completion of tasks that are of course without real verification
@@ -16,7 +19,6 @@ This script is under development, there may still be many bugs or glitches that 
   - Purchase items in the shop that can be set to the maximum price.
   - Automatically use items that have higher Reward Points
   - Manage the items in the account's BAG(ITEM)
-  - Manage the items with the ability to sell items (on proggress)
   - Can run 24/7 using vps / rdp or something like that
 
 
@@ -62,10 +64,12 @@ This script is under development, there may still be many bugs or glitches that 
     "use_proxy": false,
     "auto_upgrade_skill": false,
     "auto_complete_task": false,
+    "show_device_equipment": false,
     "auto_open_box": false,
-    "auto_open_box_max_price": 7000,
+    "auto_open_box_max_price": 1000,
     "auto_buy_item": false,
-    "auto_buy_item_max_price": 6000,
+    "auto_buy_item_max_price": 10000,
+    "auto_sell_item": false,
     "account_delay": 5,
     "countdown_loop": 3800
     }
