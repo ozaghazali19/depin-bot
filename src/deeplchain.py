@@ -23,7 +23,7 @@ def _banner():
  ██║   ██║   ███████║╚█████╔╝██║  ██║╚███╔███╔╝
  ╚═╝   ╚═╝   ╚══════╝ ╚════╝ ╚═╝  ╚═╝ ╚══╝╚══╝  """ 
     print(Fore.GREEN + Style.BRIGHT + banner + Style.RESET_ALL)
-    print(hju + f" DePin Alliance Telegram Bot (TEST V.1.0)")
+    print(hju + f" DePin Alliance Telegram Bot (TEST V.1.1)")
     print(mrh + f" FREE TO USE = Join us on {pth}t.me/DEEPLCHAIN")
     print(mrh + f" before start please '{hju}git pull{mrh}' to update bot")
     log_line()
