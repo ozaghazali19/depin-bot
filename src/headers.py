@@ -1,3 +1,5 @@
+from src.agent import generate_random_user_agent
+
 def headers():
     return {
         'Content-Type': 'application/json',
@@ -9,5 +11,5 @@ def headers():
         'sec-fetch-site': 'same-site',
         'origin': 'https://app.depinalliance.xyz',
         'referrer': 'https://app.depinalliance.xyz',
-        'user-agent:': 'Mozilla/5.0 (Linux; Android 12; K) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.127 Mobile Safari/537.36'
+        'user-agent:': generate_random_user_agent()
     }
