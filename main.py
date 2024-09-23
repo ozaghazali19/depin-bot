@@ -14,6 +14,7 @@ def main():
     max_price = config.get('auto_open_box_max_price', 0)
     auto_buy_item = config.get('auto_buy_item', False)
     max_item_price = config.get('auto_buy_item_max_price', 0)
+    auto_sell_item = config.get('auto_sell_item', False)
     delay = config.get('account_delay', 5)
     loop = config.get('countdown_loop', 3800)
     use_proxy = config.get('use_proxy', False) 
@@ -35,7 +36,13 @@ def main():
 
         log(hju + f"Processing account {pth}{i}/{len(query_data_list)}") 
         if proxy:
-            log(hju + f"Using proxy: {pth}{proxy}")
+            proxy_url = proxy 
+            if '@' in proxy_url:
+                host_port = proxy_url.split('@')[-1]
+            else:
+                host_port = proxy_url.split('//')[-1]
+            
+            log(hju + f"Using proxy: {pth}{host_port}")
             log(htm + "~" * 38)
 
         user_data = dep.extract_user_data(query_data)
@@ -62,33 +69,35 @@ def main():
                     break
                 device_index = device_indices[0]
 
-                equipped_items = dep.get_equipped_items(user_id, device_index)
-                if equipped_items is None:
-                    log(mrh + f"No equipped items found for user ID: {pth}{user_id}")
-                    break
                 if auto_open_box:
                     dep.open_box(user_id, max_price)
                 else:
                     log(kng + f"Auto open cyber box is disabled!")
-                for item_type in ["CPU", "GPU", "RAM", "STORAGE"]:
-                    dep.get_items_by_type(user_id, item_type)
                 if auto_buy_item:
                     dep.auto_buy_item(user_id, device_index, max_item_price)
-                if upgrade_skill:
-                    dep.upgrade_skill(user_id)
                 else:
-                    log(kng + f"Auto upgrade skill is disabled!")
+                    log(kng + f"Auto buy item is disabled!")
+                for item_type in ["CPU", "GPU", "RAM", "STORAGE"]:
+                    dep.get_items_by_type(user_id, item_type)
                 if auto_task:
                     dep.get_task(user_id)
                     dep.complete_quest(user_id)
                 else:
                     log(kng + f"Auto complete task is disabled!")
+                if upgrade_skill:
+                    dep.upgrade_skill(user_id)
+                else:
+                    log(kng + f"Auto upgrade skill is disabled!")
+                if auto_sell_item:
+                    dep.sell_user_items(user_id)
+                else:
+                    log(kng + f"Auto sell item is disable!")
                 break 
 
             except requests.exceptions.ProxyError as e:
                 log(mrh + f"Proxy error occurred: {e}")
                 if "407" in str(e): 
-                    log(bru + f"Proxy authentication failed. Trying another proxy...")
+                    log(bru + f"Proxy authentication failed. Trying another")
                     if proxies:
                         proxy = random.choice(proxies)
                         proxies 
@@ -102,12 +111,12 @@ def main():
 
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 401:
-                    log(bru + f"Token expired or Unauthorized. Attempting to login again...")
+                    log(bru + f"Token expired or Unauth. Attempting to login")
                     token = dep.login(query_data, user_id)
                     if token:
-                        log(hju + f"Re-login successful for user ID {pth}{user_id}{hju}. Continuing actions.")
+                        log(hju + f"Re-login successful Continuing action")
                     else:
-                        log(mrh + f"Re-login failed for user ID {pth}{user_id}{pth}. Skipping this user.")
+                        log(mrh + f"Re-login failed  Skipping")
                         break
                 else:
                     log(htm + f"HTTP error occurred: {htm}{e}")
