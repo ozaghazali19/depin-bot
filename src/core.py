@@ -8,9 +8,11 @@ from urllib.parse import unquote
 from json.decoder import JSONDecodeError
 from datetime import datetime, timedelta
 from src.headers import headers
-from src.deeplchain import log, mrh, pth, hju, kng, bru, htm, pth, reset
+from src.agent import generate_random_user_agent
+from src.deeplchain import log, mrh, pth, hju, kng, bru, htm, pth, reset, read_config
 
 init(autoreset=True)
+config = read_config()
 
 def load_proxies():
     try:
@@ -25,13 +27,13 @@ class Depin:
     def __init__(self, token=None, proxy=None):
         self.base_url = "https://api.depinalliance.xyz"
         self.access_token = token
+        self.show_item = config.get('show_device_equipment')
         self.base_headers = headers(token) if token else {}
         self.proxy = proxy
         self.session = requests.Session()
         if self.proxy:
             self.set_proxy(self.proxy)
         
-
     @staticmethod
     def extract_user_data(auth_data: str) -> dict:
         if not auth_data:
@@ -65,20 +67,25 @@ class Depin:
             "Content-Type": "application/json",
             "Origin": self.base_url,
             "Referer": f"{self.base_url}/",
-            "User-Agent": "Mozilla/5.0 (Linux; Android 12; K) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.127 Mobile Safari/537.36",
+            "User-Agent": generate_random_user_agent(),
         }
-        data = self._request('POST', "/users/auth", headers=headers, json=payload)
-        if data is None:
-            log(htm + f"Error: No response received from the server during login.")
-            return None
-        
-        access_token = data.get('data', {}).get('accessToken')
-        if access_token:
-            self.save_token(user_id, access_token)
-            return access_token
-        else:
-            log(mrh + f"Access Token not found.")
-            return
+        while True:
+            try:
+
+                data = self._request('POST', "/users/auth", headers=headers, json=payload)
+                if data is None:
+                    log(htm + f"No response received from the server during login.")
+                    return None
+                
+                access_token = data.get('data', {}).get('accessToken')
+                if access_token:
+                    self.save_token(user_id, access_token)
+                    return access_token
+                else:
+                    log(mrh + f"Access Token not found.")
+                    return
+            except Exception as e:
+                return
 
     def local_token(self, user_id: str) -> str:
         if not os.path.exists("tokens.json"):
@@ -119,13 +126,13 @@ class Depin:
         
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
-                log(htm + f"Unauthorized. Attempting to login again...")
+                log(kng + f"Unauthorized. Attempting to login again...")
                 token = self.login(self.local_token(user_id), user_id) 
                 if token:
-                    log(hju + f"Login successful. Trying to fetch user data again.")
+                    log(hju + f"Login successful. fetching user data again.")
                     self.user_data(user_id)
                 else:
-                    log(htm + f"Login failed for user {user_id}. Cannot fetch user data.")
+                    log(htm + f"Login failed {user_id}. Cannot fetch user data.")
             else:
                 log(mrh + f"HTTP error occurred: {htm}{e}")
         except AttributeError as e:
@@ -335,10 +342,10 @@ class Depin:
                 current_item = self.get_current_item(user_id, item_type)
 
                 if current_item and current_item['miningPower'] < highest_power_item['miningPower']:
-                    log(hju + f"Current {pth}{item_type}{hju} item has lower power. Unequipping: {pth}{current_item['name']}{hju} | Power: {pth}{current_item['miningPower']}")
+                    log(hju + f"Unequipping: {pth}{current_item['name']}{hju} | Power: {pth}{current_item['miningPower']:,.0f}")
                     self.unequip_item(user_id, current_item['id'])
                 
-                log(hju + f"Adding highest {pth}{item_type}:")
+                log(hju + f"Try adding the highest {pth}{item_type}:")
                 log(hju + f"Name {pth}{highest_power_item['name']} {hju}| Power: {pth}{highest_power_item['miningPower']:,.0f}")
                 self.add_item_to_device(user_id, highest_power_item['id'], item_type)
             else:
@@ -397,24 +404,27 @@ class Depin:
         if not token:
             log(mrh + f"Error: Token not found.")
             return
-        device_indices = self.get_device_indices(user_id)
-        if not device_indices:
-            log(mrh + f"Error: No valid device indices found.")
-            return
-        for device_index in device_indices:
-            headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
-            response = self._request('GET', f"/devices/add-item/{device_index}/{item_id}", headers=headers)
-            if response.get('status') == 'success':
-                log(hju + f"Successfully added {pth}{item_id} {hju}to device {pth}{device_index}")
-                return 
-            else:
-                message = response.get('message', 'Unknown error')
-                if message == "MSG_DEVICE_USER_CANNOT_ADD_MORE_ITEM":
-                    log(kng + f"Can't add more {pth}{item_type} {kng}to device {pth}{device_index}")
+        try:
+            device_indices = self.get_device_indices(user_id)
+            if not device_indices:
+                log(mrh + f"Error: No valid device indices found.")
+                return
+            for device_index in device_indices:
+                headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
+                response = self._request('GET', f"/devices/add-item/{device_index}/{item_id}", headers=headers)
+                if response.get('status') == 'success':
+                    log(hju + f"Successfully added {pth}{item_id} {hju}to device {pth}{device_index}")
+                    return 
                 else:
-                    log(htm + f"Error adding item to device:", message)
-        if len(device_indices) <= 3:
-            self.add_new_device(user_id)
+                    message = response.get('message', 'Unknown error')
+                    if message == "MSG_DEVICE_USER_CANNOT_ADD_MORE_ITEM":
+                        log(kng + f"Can't add more {pth}{item_type} {kng}to device {pth}{device_index}")
+                    else:
+                        log(htm + f"Error adding item to device:", message)
+            if len(device_indices) <= 3:
+                self.add_new_device(user_id)
+        except Exception as e:
+            return
 
     def get_device_indices(self, user_id: str):
         token = self.local_token(user_id)
@@ -464,16 +474,21 @@ class Depin:
 
         headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
         response = self._request('GET', f"/devices/user-device-item?index={device_index}&page=1&size=12", headers=headers)
-        if response is None:
-            log(mrh + f"No equipped items found for user ID: {pth}{user_id}")
-            return
-        elif response.get('status') == 'success':
-            items = response.get('data', [])
-            self.log_items(device_index, items)
-            return items
-        else:
-            log(htm + f"Error fetching equipped items:", response.get('message'), "| HTTP Status:", response.get('status'))
-            return []
+        while True:
+            try:
+                if response is None:
+                    log(mrh + f"No equipped items found for user ID: {pth}{user_id}")
+                    return
+                elif response.get('status') == 'success':
+                    items = response.get('data', [])
+                    if self.show_item:
+                        self.log_items(device_index, items)
+                    return items
+                else:
+                    log(htm + f"Error fetching equipped items:", response.get('message'), "| HTTP Status:", response.get('status'))
+                    return []
+            except Exception as e:
+                return
    
     def auto_buy_item(self, user_id: str, device_index: int, max_item_price: float):
         token = self.local_token(user_id)
@@ -488,9 +503,9 @@ class Depin:
             return
 
         equipped_powers = {item['code']: item['miningPower'] for item in equipped_items}
-        page_number = 1
+        page_number = 2
         while True:
-            response = self._request('GET', f"/devices/item?page={page_number}&sortBy=price&sortAscending=true&size=12", headers=headers)
+            response = self._request('GET', f"/devices/item?page={page_number}&sortBy=miningPower&sortAscending=true&size=12", headers=headers)
             if response.get('status') != 'success':
                 log(htm + f"Error fetching items for purchase:", response.get('message'))
                 break
@@ -502,15 +517,57 @@ class Depin:
             for item in items:
                 if item['code'] not in equipped_powers and item['price'] <= max_item_price:
                     for equipped_code, equipped_power in equipped_powers.items():
-                        if item['miningPower'] > equipped_power:
+                        if item['miningPower'] >= equipped_power:
                             buy_response = self._request('POST', "/devices/buy-item", headers=headers, json={"number": 1, "code": item['code']})
                             if buy_response.get('status') == 'success':
-                                log(hju + f"Successfully bought {pth}{item['name']} {hju}with price {pth}{item['price']}.")
+                                log(hju + f"Buying {pth}{item['name']} {hju}| price {pth}{item['price']}.")
                             elif buy_response.get("status") == "error" and buy_response.get("message") == "MSG_USER_POINT_NOT_ENOUGH":
-                                log(kng + f"Not enough point to buy the {pth}{item['name']} {kng}items!")
+                                log(kng + f"Not enough point for {pth}{item['name']}{kng}!")
                                 return
                             else:
                                 log(htm + f"Error buying {item['name']}:", buy_response.get('message'))
                             break  
 
             page_number += 1 
+
+    def sell_user_items(self, user_id: str):
+        token = self.local_token(user_id)
+        if not token:
+            log(mrh + f"Error: Token not found.")
+            return None
+
+        headers = {**self.base_headers, "Authorization": f"Bearer {token}"}
+        
+        response = self._request('GET', "/devices/user-item", headers=headers, params={
+            "sortBy": "price",
+            "sortAscending": "true",
+            "type": "",
+            "page": 1,
+            "size": 12
+        })
+
+        if response.get('status') != 'success':
+            log(htm + "Error fetching user items:", response.get('message'))
+            return None
+
+        for item in response['data']:
+            item_name = item['name']
+            item_code = item['code']
+            total_item = item['totalItem']
+            is_can_sell = item['isCanSell']
+
+            if item_name == "CYBER BOX":
+                log(bru + f"Skipping {item_name}, no items sold.")
+                continue
+
+            if is_can_sell:
+                log(hju + f"Selling {pth}{total_item} of {item_name}")
+                self._request('POST', "/devices/sell-item", headers=headers, json={
+                    "code": item_code,
+                    "number": total_item - 2
+                })
+            else:
+                log(mrh + f"Item {item_name} cannot be sold.")
+
+        return True
+
