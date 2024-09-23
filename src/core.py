@@ -318,6 +318,9 @@ class Depin:
             if message == "MSG_ITEM_OPEN_NOT_ENOUGH":
                 log(kng + "You have no box to open!")
                 break
+            elif message == "MSG_USER_POINT_NOT_ENOUGH":
+                log(kng + "You don't have enough points to open the box!")
+                break
             elif use_key.get('status') == 'success':
                 for reward in use_key.get('data', []):
                     reward_type = reward.get("type")
