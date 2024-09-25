@@ -1,13 +1,13 @@
 {
     "use_proxy": false,
-    "auto_upgrade_skill": false,
-    "auto_complete_task": false,
-    "show_device_equipment": false,
-    "auto_open_box": false,
+    "auto_upgrade_skill": true,
+    "auto_complete_task": true,
+    "show_device_equipment": true,
+    "auto_open_box": true,
     "auto_open_box_max_price": 1000,
-    "auto_buy_item": false,
+    "auto_buy_item": true,
     "auto_buy_item_max_price": 10000,
-    "auto_sell_item": false,
+    "auto_sell_item": true,
     "account_delay": 5,
     "countdown_loop": 3800
 }
